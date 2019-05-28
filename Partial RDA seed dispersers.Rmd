@@ -1,0 +1,338 @@
+---
+title: "Partial RDA seed dispersers"
+author: "Luis Antonio Arias Medellin"
+date: "May 22, 2018"
+output: html_document
+---
+##Partial RDA Seed dispersers
+```{r,fig.width=10, fig.height=8,warning=F}
+#Load libraries
+library("xlsx")
+library("rmarkdown")
+library("ade4")
+library("vegan")
+library("gclus")
+library("ape")
+
+
+#Read file
+base.df<-read.xlsx("Data bases/Frugivores_for_Luis.xlsx",sheetName=1)
+
+#I am going to aggregate the data by patch. I will obtain the mean of variables
+seed_dispersers_variables<-aggregate(cbind(Area=base.df$Area,Prop_OldFor=base.df$Prop_OldFor,
+                         Pro_allFor=base.df$Pro_allFor,Alti=base.df$Alti)~
+                     base.df$Site,FUN=mean)
+
+#Rename columns
+colnames(seed_dispersers_variables)[1]<-"Site"
+
+#Extract explanatory variables and covariates
+env_var<-data.frame(scale(seed_dispersers_variables[,2:3])) #This is if I aggregate and take out prop all for
+raw.env.data<-data.frame(seed_dispersers_variables[,2:3])
+covariate<-data.frame(scale(seed_dispersers_variables[,5]))
+raw.covariate<-data.frame(seed_dispersers_variables[,5])
+colnames(raw.covariate)<-"elevation"
+
+
+#I am going to aggregate species by patch.
+dispersers.hell<-aggregate(cbind(Turdus_grayi=base.df$Turdus_grayi,
+                                 Catharus_aurantiirostris=base.df$Catharus_aurantiirostris,
+                                 Myadestes_melanops=base.df$Myadestes_melanops,
+                                 Aulacorhynchus_prasinus=base.df$Aulacorhynchus_prasinus,
+                                 Momotus_momota=base.df$Momotus_momota,
+                                 Geotrygon_montana=base.df$Geotrygon_montana,
+                                 Turdus_assimilis=base.df$Turdus_assimilis,
+                                 Saltator_maximus=base.df$Saltator_maximus)~base.df$Site,FUN=sum)
+
+#Make a copy of original data base to use for only Turdus grayi abundance
+raw.abundances<-dispersers.hell
+
+#Put rownames on matrix
+#rownames(dispersers.hell)<-base.df[,1]
+
+
+#Plot pairs of abundance of each seed disperser with environmental variables
+#pairs(cbind(dispersers.hell,seed_dispersers_variables[,c(2,3,4,5)]))
+pairs(cbind(dispersers.hell,log(seed_dispersers_variables[,c(2)]),seed_dispersers_variables[,c(3,4,5)]),panel=panel.smooth) #ASK WHAT DOES HE MEANS WITH PROP.ALL.FOR (I WOULD THINK PRIMARY AND SECONDARY FOREST)
+
+#It is needed that species abundance to be transformed
+#dispersers.hell<-decostand(dispersers.hell,"hellinger") #This is if I use raw data
+dispersers.hell<-decostand(dispersers.hell[-1],"hellinger") #This is if I aggregate
+#dispersers.hell<-decostand(dispersers.hell[-1],"pa") #This is if I want to run a RDA with presence/abscence
+#dispersers.hell<-sqrt(dispersers.hell[-1]) #This is for square root transformation
+```
+```{r,fig.width=8, fig.height=8}
+#Make RDA
+dispersers.prda<-rda(dispersers.hell,env_var,covariate) # all variables
+summary(dispersers.prda)
+
+#Unadjusted R^2 retrieved from the rda result
+R2<-RsquareAdj(dispersers.prda)$r.squared
+R2
+
+#Adjusted R^2 retrieved from the rda object
+R2adj<-RsquareAdj(dispersers.prda)$adj.r.squared
+R2adj
+
+#Triplot of the rda results
+#Scaling 1: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+#plot(dispersers.rda,scaling=1,main="Triplot RDA",type="points")
+#sp.sc<-scores(dispersers.rda,choices=1:2,scaling=1,display="sp")
+#arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red")
+#spp.scr <- scores(dispersers.rda, display = "species", scaling = 1) # y
+#text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+#     col="black", xpd=T)
+#legend(x=1.2,y=1,legend=paste(1:8,rownames(spp.scr[1:8,]),sep=" "),bty="n",cex=0.8)
+
+#Scaling 2: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+
+jpeg("Triplot RDA seed dispersers.jpg",quality=100,width=1000,height=700)
+par(mar=c(6,6,3,3),xpd=F)
+#plot(dispersers.prda,scaling=2,main="Triplot RDA seed dispersers (scaling 2)",type="points",cex=2,cex.axis=2,cex.lab=2,cex.main=2)
+plot(dispersers.prda,scaling=2,type="points",cex=2,cex.axis=2,cex.lab=2,xlim=c(0,0),ylim=c(-1.5,0.3))
+sp.sc<-scores(dispersers.prda,choices=1:2,scaling=2,display="sp")
+arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red",lwd=3)
+spp.scr <- scores(dispersers.prda, display = "species", scaling = 2) # y
+text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+     col="black", xpd=T,cex=1.5)
+#legend(x=1,y=1.6,legend=paste(1:8,gsub(pattern="_",replacement=" ",x=rownames(spp.scr[1:8,])),sep=" "),bty="n",cex=1.5)
+legend(x=-1.4,y=0,legend=paste(1:8,gsub(pattern="_",replacement=" ",x=rownames(spp.scr[1:8,])),sep=" "),bty="n",cex=1.3)
+
+dev.off()
+
+anova.cca(dispersers.prda)
+
+extractAIC(dispersers.prda)
+#anova(dispersers.prda,by="axis",step=1000)
+```
+
+##Regression of abundance of Turdus grayi only
+```{r,echo=FALSE}
+turdus.grayi<-data.frame(raw.abundances[,"Turdus_grayi"])
+colnames(turdus.grayi)<-"Turdus_grayi"
+
+
+panel.hist <- function(x, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5) )
+    h <- hist(x, plot = FALSE)
+    breaks <- h$breaks; nB <- length(breaks)
+    y <- h$counts; y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = "cyan", ...)
+}
+
+
+panel.cor <- function(x, y, digits = 2, prefix = "", cex.cor, ...)
+{
+    usr <- par("usr"); on.exit(par(usr))
+    par(usr = c(0, 1, 0, 1))
+    r <- abs(cor(x, y))
+    txt <- format(c(r, 0.123456789), digits = digits)[1]
+    txt <- paste0(prefix, txt)
+    if(missing(cex.cor)) cex.cor <- 0.8/strwidth(txt)
+    text(0.5, 0.5, txt, cex = cex.cor * r)
+}
+```
+
+```{r}
+
+pairs(cbind(turdus.grayi,raw.env.data,raw.covariate),lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth,main="Raw data")
+
+pairs(cbind(turdus.grayi,log(raw.env.data),raw.covariate),lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth,main="Raw data")
+
+pairs(cbind(turdus.grayi,log(raw.env.data$Area),asin(sqrt(raw.env.data$Prop_OldFor)),raw.covariate),lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth,main="Raw data")
+
+
+```
+
+```{r}
+#Check for collinearity of the data
+library("usdm")
+vif(data.frame(turdus.grayi,log(raw.env.data),raw.covariate))
+
+
+#Do poisson regression
+#turdus.mod1<-glm(turdus.grayi$Turdus_grayi~scale(log(raw.env.data$Area))+scale(log(raw.env.data$Prop_OldFor))+scale(raw.covariate$elevation),poisson)
+turdus.mod1<-glm(turdus.grayi$Turdus_grayi~scale(raw.env.data$Area)+scale(raw.env.data$Prop_OldFor)+scale(raw.covariate$elevation),poisson)
+summary(turdus.mod1)
+
+#Quasipoisson regression due to overdispersion
+#turdus.mod1<-glm(turdus.grayi$Turdus_grayi~scale(log(raw.env.data$Area))+scale(log(raw.env.data$Prop_OldFor))+scale(raw.covariate$elevation),quasipoisson)
+turdus.mod1<-glm(turdus.grayi$Turdus_grayi~scale(raw.env.data$Area)+scale(raw.env.data$Prop_OldFor)+scale(raw.covariate$elevation),quasipoisson)
+summary(turdus.mod1)
+
+#Order the data to draw a line in the plot
+ordered.data<-cbind(turdus.grayi,raw.env.data,raw.covariate)
+ordered.data<-ordered.data[order(ordered.data$Area),]
+```
+
+```{r,fig.width=8, fig.height=8}
+#Extract the formula to draw line on plot
+formula.turdus<-exp(turdus.mod1$coefficients[1]+turdus.mod1$coefficients[2]*scale(ordered.data$Area))
+
+#Plot PATCH SIZE
+plot(scale(ordered.data$Area),ordered.data$Turdus_grayi,xlab="Patch size",ylab="Abundance",xaxt="n")
+par(new=T)
+#Plot estimated line
+plot(scale(ordered.data$Area),formula.turdus,type="l",col="red",lwd=2,ylim=c(min(ordered.data$Turdus_grayi),max(ordered.data$Turdus_grayi)),axes=F,ylab="",xlab="")
+
+#Put labels in axis. Scaling is done by the follwing formula: (original value-mean)/sd
+#I want to have a certain range of values represented in the x axis, but I need to obtain the numbers of the scaled values so that I can put them in the x axis
+original.values<-seq(from=100,to=max(round(ordered.data$Area,-2)),by=200)
+scaled.values<-(original.values-mean(ordered.data$Area))/sd(ordered.data$Area)
+
+#Put values in the x axis
+axis(side=1,labels=original.values,at=scaled.values)
+
+##PLOT PROPORTION OF FOREST
+#Extract the formula to draw line on plot
+formula.turdus<-exp(turdus.mod1$coefficients[1]+turdus.mod1$coefficients[3]*scale(ordered.data$Prop_OldFor))
+
+#Plot data
+plot(scale(ordered.data$Prop_OldFor),ordered.data$Turdus_grayi,xlab="Proportion of forest in a 1 km radius",ylab="Abundance",xaxt="n")
+par(new=T)
+#Plot estimated line
+plot(scale(ordered.data$Prop_OldFor),formula.turdus,type="l",col="red",lwd=2,ylim=c(min(ordered.data$Turdus_grayi),max(ordered.data$Turdus_grayi)),axes=F,ylab="",xlab="")
+
+#Put labels in axis. Scaling is done by the follwing formula: (original value-mean)/sd
+#I want to have a certain range of values represented in the x axis, but I need to obtain the numbers of the scaled values so that I can put them in the x axis
+original.values<-seq(from=0,to=max(round(ordered.data$Prop_OldFor,1)),by=0.2)
+scaled.values<-(original.values-mean(ordered.data$Prop_OldFor))/sd(ordered.data$Prop_OldFor)
+
+#Put values in the x axis
+axis(side=1,labels=original.values,at=scaled.values)
+```
+
+#Turdus grayi abundance plot
+```{r}
+library("GGally")
+cbind(turdus.grayi,raw.env.data,raw.covariate) %>%
+  transmute(Turdus_grayi=log(Turdus_grayi+1),log.area=log(Area),Prop_OldFor,elevation) %>% 
+  ggpairs(upper=list(continuous="points",wrap("smooth", method = "lm")),lower=list(continuous="cor"))
+  
+ggsave("Graphs/Turdus grayi vs variables.jpg")
+```
+
+
+
+##Species richness
+```{r}
+#Take out the column that indicates site id
+richness<-raw.abundances[,-1]
+
+#Add a 1 when an animal is detected
+richness[richness>0] <-1
+
+#Sum the number of species per site
+richness$richness<-rowSums(richness)
+
+#Do a data base that has the richness along with the environmental varibables
+richness<-cbind(richness[,ncol(richness)],raw.env.data,raw.covariate)
+colnames(richness)[1]<-"richness"
+
+#Plot pairs
+pairs(richness,lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
+
+#Create a column of the logarithm of patch size
+richness$logArea<-log(richness$Area)
+
+#Plot pairs
+pairs(richness[,c("richness","logArea","Prop_OldFor","elevation")],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
+
+#Make linear model including all the variables
+richnes.model1<-lm(richness~scale(logArea)+scale(Prop_OldFor)+scale(elevation),data=richness)
+summary(richnes.model1)
+
+#Check assumptions
+par(mfrow=c(2,2))
+plot(richnes.model1)
+
+dev.off()
+
+#Check normality of data
+library("car")
+qqPlot(richnes.model1$residuals)
+
+
+
+#Make linear model exluding area
+richnes.model2<-lm(richness~scale(Prop_OldFor)+scale(elevation),data=richness)
+summary(richnes.model2)
+
+#Check assumptions
+par(mfrow=c(2,2))
+plot(richnes.model2)
+
+dev.off()
+
+#Check normality of data
+library("car")
+qqPlot(richnes.model2$residuals)
+
+
+
+
+#Make linear model excluding proportion of forest
+richnes.model3<-lm(richness~scale(elevation),data=richness)
+summary(richnes.model3)
+
+#Check assumptions
+par(mfrow=c(2,2))
+plot(richnes.model3)
+
+dev.off()
+
+#Check normality of data
+library("car")
+qqPlot(richnes.model3$residuals)
+
+
+#Select best random factor model using AIC
+models.aic<-AIC(richnes.model1,richnes.model2,richnes.model3)
+library("MuMIn")
+round(Weights(models.aic),digits=2) #Best model includes only proportion of forest 
+```
+
+# Plot of Species richness vs patch size and proportion of forest
+```{r,fig.width=8, fig.height=8}
+jpeg("Richness vs patch size and prop forest.jpg",quality=100,width=1200,height=700)
+
+#Patch size
+par(mar=c(6,6,3,3),xpd=F,mfrow=c(1,2))
+plot(richness$logArea,richness$richness,xlab="Log patch size",ylab="Species richness",cex=2,cex.axis=2,cex.lab=2)
+
+abline(lm(richness ~ logArea, data = richness),col="red",lwd=2)
+
+text(x=7,y=5,"a)",cex=2)
+
+#Proportion of forest
+par(mar=c(6,6,3,3),xpd=F)
+plot(richness$Prop_OldFor,richness$richness,xlab="Proportion of forest",ylab="Species richness",cex=2,cex.axis=2,cex.lab=2)
+
+abline(lm(richness ~ Prop_OldFor, data = richness),col="red",lwd=2)
+
+text(x=0.8,y=5,"b)",cex=2)
+
+dev.off()
+```
+
+
+##Species abundance
+```{r}
+#Take out the column that indicates site id
+library("reshape2")
+abundance<-melt(raw.abundances, id.vars="base.df$Site")
+colnames(abundance)<-c("Site","Species","Abundance")
+abundance<-aggregate(abundance$Abundance,by=list(Site=abundance$Site),FUN=sum)
+colnames(abundance)[2]<-"Abundance"
+
+abundance<-merge(abundance,seed_dispersers_variables,by="Site",all=F)
+abundance$logArea<-log(abundance$Area)
+
+#Plot pairs
+pairs(abundance[,c(-1)],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
+
+```

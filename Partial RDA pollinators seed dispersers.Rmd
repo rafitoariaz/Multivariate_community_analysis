@@ -1,0 +1,298 @@
+---
+title: "RDA pollinators and seed dispersers"
+author: "Luis Antonio Arias Medellin"
+date: "May 16, 2018"
+output: html_document
+---
+## RDA with patch size, proportion of forest and elevation
+
+```{r include=F}
+rm(list = ls())
+#Load libraries
+library("xlsx")
+library("rmarkdown")
+
+#Read file
+explanatory_variables<-read.xlsx("Data bases/Hummingbird Adam.xlsx",sheetName=1)
+```
+
+I am going to select the variables 
+```{r}
+#Select variables I am interested
+env_var<-explanatory_variables[c("Hectars..ha.","PF1000","Elevation")] #Took out % forest in a 1 km radius becuase it is similar to proportion of forest in a 1 km radius. 
+
+#Scale varibles since they have different units
+env_var<-data.frame(scale(env_var)) 
+```
+
+
+Run RDA with patch size, proportion of forest and elevation as explanatory variables
+```{r,include=F}
+#Load libraries
+library("ade4")
+library("vegan")
+library("gclus")
+library("ape")
+library("xlsx")
+```
+```{r}
+#Read file
+pollinators_abundance<-read.xlsx("Data bases/Hummingbird Adam.xlsx",sheetName=1)
+
+#It seems that the green hermit hummingbird does not increase its abundance with patch size, forest cover or elevation, while the Violet saberwing abundance increases with this 3 variables.
+pairs(cbind(pollinators_abundance[,c(11,12,14,15,17,19,4)],log(pollinators_abundance[,c(2,3)])),panel=panel.smooth)
+
+#Select only the species abundance data that I am interested in based in Betts etal 2015b 
+pollinators_abundance<-pollinators_abundance[,c(11,12,14,15,17,19)]
+
+#Transform species using Hellinger transformation
+pollinators_abundance<-decostand(pollinators_abundance,"hellinger")
+```
+```{r}
+#Make RDA
+pollinators.rda<-rda(pollinators_abundance~.,env_var)
+#pollinators.rda<-rda(pollinators_abundance~.,cbind(env_var,pollinators_variables$Elevation)) #I added elevation but it did not explain too much more
+summary(pollinators.rda)
+```
+
+Triplot
+```{r,fig.width=8, fig.height=8}
+plot(pollinators.rda,scaling=2,main="Triplot RDA pollinators Scaling 2",type="points")
+sp.sc<-scores(pollinators.rda,choices=1:2,scaling=2,display="sp")
+arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="darkgreen",lwd=2)
+spp.scr <- scores(pollinators.rda, display = "species", scaling = 2) # y
+text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+     col="black", xpd=T)
+#legend(x=0.5,y=0.75,legend=paste(1:6,rownames(spp.scr[1:6,]),sep=" "),bty="n",cex=0.8)
+legend(x=0.5,y=1,legend=paste(1:6,c("Green crowned brilliant","Green hermit","Rufous tailed","Scaly breasted","Striped throated hermit","Violet saberwing"),sep=" "),bty="n",cex=0.8)
+```
+```{r,fig.width=8, fig.height=8,include=F}
+#*************DO CORRELATION OF PCA AXIS OF RESIDUALS WITH ENVIRONMENTAL VARIABLES THAT WERE NOT CONSIDERED TO SEE HOW THEY CORRELATE*************
+
+#This plot is for power point presentation but is the same one as the latter, only bigger letters and legend in other position. 1000x800
+#par(cex=1.8,xpd=F,mar=c(4,4,3,12))
+#plot(pollinators.rda,scaling=2,main="Triplot RDA Scaling 2",type="points",cex=2)
+#sp.sc<-scores(pollinators.rda,choices=1:2,scaling=2,display="sp")
+#arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="darkgreen",lwd=2)
+#spp.scr <- scores(pollinators.rda, display = "species", scaling = 2) # y
+#text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+#      col="black", xpd=T)
+#par(xpd=T)
+#legend(x=0.9,y=1.5,legend=paste(1:6,c("Green crowned brilliant","Green hermit","Rufous tailed","Scaly breasted","Striped throated hermit","Violet saberwing"),sep=" "),bty="n",cex=0.8)
+
+```
+```{r}
+coef(pollinators.rda)
+Radj<-RsquareAdj(pollinators.rda)$adj.r.squared
+Radj
+anova.cca(pollinators.rda)
+anova(pollinators.rda,by="axis",step=1000)
+```
+
+
+#Partial RDA for pollinators
+```{r}
+#Select variables I am interested. Divide them in explanatory variables and covariates
+env_var<-explanatory_variables[c("Hectars..ha.","PF1000")] #Took out % forest in a 1 km radius becuase it is similar to proportion of forest in a 1 km radius. 
+covariate<-explanatory_variables[c("Elevation")]
+
+#Scale varibles since they have different units
+env_var<-data.frame(scale(env_var)) 
+covariate<-data.frame(scale(covariate)) 
+
+#Make RDA
+pollinators.prda<-rda(pollinators_abundance,env_var,covariate)
+#pollinators.rda<-rda(pollinators_abundance~.,cbind(env_var,pollinators_variables$Elevation)) #I added elevation but it did not explain too much more
+summary(pollinators.prda)
+```
+
+```{r,fig.width=8, fig.height=8}
+plot(pollinators.prda,scaling=2,main="Triplot RDA pollinators Scaling 2",type="points")
+sp.sc<-scores(pollinators.prda,choices=1:2,scaling=2,display="sp")
+arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="darkgreen",lwd=2)
+spp.scr <- scores(pollinators.prda, display = "species", scaling = 2) # y
+text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+     col="black", xpd=T)
+#legend(x=0.5,y=0.75,legend=paste(1:6,rownames(spp.scr[1:6,]),sep=" "),bty="n",cex=0.8)
+legend(x=0.5,y=1,legend=paste(1:6,c("Green crowned brilliant","Green hermit","Rufous tailed","Scaly breasted","Striped throated hermit","Violet saberwing"),sep=" "),bty="n",cex=0.8)
+```
+
+```{r}
+coef(pollinators.prda)
+Radj<-RsquareAdj(pollinators.prda)$adj.r.squared
+Radj
+anova.cca(pollinators.prda)
+#anova(pollinators.prda,by="axis",step=1000)
+```
+
+##RDA Seed dispersers
+```{r}
+#Load libraries
+library("xlsx")
+library("rmarkdown")
+
+
+#Read file
+base.df<-read.xlsx("Data bases/Frugivores_for_Luis.xlsx",sheetName=1)
+
+#I am going to aggregate the data by patch. I will obtain the mean of variables
+env_var<-aggregate(cbind(Area=base.df$Area,Prop_OldFor=base.df$Prop_OldFor,
+                         Pro_allFor=base.df$Pro_allFor,Alti=base.df$Alti)~
+                     base.df$Site,FUN=mean)
+
+#Rename columns
+colnames(env_var)[1]<-"Site"
+
+env_var<-data.frame(scale(env_var[,c(-1,-4)])) #This is if I aggregate and take out prop all for
+
+#I am going to aggregate species by patch.
+dispersers.hell<-aggregate(cbind(Turdus_grayi=base.df$Turdus_grayi,
+                                 Catharus_aurantiirostris=base.df$Catharus_aurantiirostris,
+                                 Myadestes_melanops=base.df$Myadestes_melanops,
+                                 Aulacorhynchus_prasinus=base.df$Aulacorhynchus_prasinus,
+                                 Momotus_momota=base.df$Momotus_momota,
+                                 Geotrygon_montana=base.df$Geotrygon_montana,
+                                 Turdus_assimilis=base.df$Turdus_assimilis,
+                                 Saltator_maximus=base.df$Saltator_maximus)~base.df$Site,FUN=sum)
+
+#Put rownames on matrix
+#rownames(dispersers.hell)<-base.df[,1]
+
+#It is needed that species abundance to be transformed
+#dispersers.hell<-decostand(dispersers.hell,"hellinger") #This is if I use raw data
+dispersers.hell<-decostand(dispersers.hell[-1],"hellinger") #This is if I aggregate
+
+```
+```{r,fig.width=8, fig.height=8}
+#Make RDA
+dispersers.rda<-rda(dispersers.hell~.,env_var) # all variables
+summary(dispersers.rda)
+
+#Unadjusted R^2 retrieved from the rda result
+R2<-RsquareAdj(dispersers.rda)$r.squared
+R2
+
+#Adjusted R^2 retrieved from the rda object
+R2adj<-RsquareAdj(dispersers.rda)$adj.r.squared
+R2adj
+
+#Triplot of the rda results
+#Scaling 1: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+#plot(dispersers.rda,scaling=1,main="Triplot RDA",type="points")
+#sp.sc<-scores(dispersers.rda,choices=1:2,scaling=1,display="sp")
+#arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red")
+#spp.scr <- scores(dispersers.rda, display = "species", scaling = 1) # y
+#text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+#     col="black", xpd=T)
+#legend(x=1.2,y=1,legend=paste(1:8,rownames(spp.scr[1:8,]),sep=" "),bty="n",cex=0.8)
+
+#Scaling 2: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+par(mar=c(4,4,3,3),xpd=F)
+plot(dispersers.rda,scaling=2,main="Triplot RDA seed dispersers scaling 2",type="points")
+sp.sc<-scores(dispersers.rda,choices=1:2,scaling=2,display="sp")
+arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red",lwd=2)
+spp.scr <- scores(dispersers.rda, display = "species", scaling = 2) # y
+text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+     col="black", xpd=T)
+legend(x=0.5,y=1.5,legend=paste(1:8,rownames(spp.scr[1:8,]),sep=" "),bty="n",cex=0.8)
+
+coef(dispersers.rda)
+Radj<-RsquareAdj(dispersers.rda)$adj.r.squared
+Radj
+RsquareAdj(dispersers.rda)
+anova.cca(dispersers.rda)
+anova(dispersers.rda,by="axis",step=1000)
+```
+
+
+##Partial RDA Seed dispersers
+```{r}
+#Load libraries
+library("xlsx")
+library("rmarkdown")
+
+
+#Read file
+base.df<-read.xlsx("Data bases/Frugivores_for_Luis.xlsx",sheetName=1)
+
+#I am going to aggregate the data by patch. I will obtain the mean of variables
+seed_dispersers_variables<-aggregate(cbind(Area=base.df$Area,Prop_OldFor=base.df$Prop_OldFor,
+                         Pro_allFor=base.df$Pro_allFor,Alti=base.df$Alti)~
+                     base.df$Site,FUN=mean)
+
+#Rename columns
+colnames(seed_dispersers_variables)[1]<-"Site"
+
+#xtract explanatory variables and covariates
+env_var<-data.frame(scale(seed_dispersers_variables[,2:3])) #This is if I aggregate and take out prop all for
+covariate<-data.frame(scale(seed_dispersers_variables[,5]))
+
+
+#I am going to aggregate species by patch.
+dispersers.hell<-aggregate(cbind(Turdus_grayi=base.df$Turdus_grayi,
+                                 Catharus_aurantiirostris=base.df$Catharus_aurantiirostris,
+                                 Myadestes_melanops=base.df$Myadestes_melanops,
+                                 Aulacorhynchus_prasinus=base.df$Aulacorhynchus_prasinus,
+                                 Momotus_momota=base.df$Momotus_momota,
+                                 Geotrygon_montana=base.df$Geotrygon_montana,
+                                 Turdus_assimilis=base.df$Turdus_assimilis,
+                                 Saltator_maximus=base.df$Saltator_maximus)~base.df$Site,FUN=sum)
+
+#Put rownames on matrix
+#rownames(dispersers.hell)<-base.df[,1]
+
+#It is needed that species abundance to be transformed
+#dispersers.hell<-decostand(dispersers.hell,"hellinger") #This is if I use raw data
+dispersers.hell<-decostand(dispersers.hell[-1],"hellinger") #This is if I aggregate
+
+```
+```{r,fig.width=8, fig.height=8}
+#Make RDA
+dispersers.prda<-rda(dispersers.hell,env_var,covariate) # all variables
+summary(dispersers.prda)
+
+#Unadjusted R^2 retrieved from the rda result
+R2<-RsquareAdj(dispersers.prda)$r.squared
+R2
+
+#Adjusted R^2 retrieved from the rda object
+R2adj<-RsquareAdj(dispersers.prda)$adj.r.squared
+R2adj
+
+#Triplot of the rda results
+#Scaling 1: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+#plot(dispersers.rda,scaling=1,main="Triplot RDA",type="points")
+#sp.sc<-scores(dispersers.rda,choices=1:2,scaling=1,display="sp")
+#arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red")
+#spp.scr <- scores(dispersers.rda, display = "species", scaling = 1) # y
+#text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+#     col="black", xpd=T)
+#legend(x=1.2,y=1,legend=paste(1:8,rownames(spp.scr[1:8,]),sep=" "),bty="n",cex=0.8)
+
+#Scaling 2: distance triplot for dispersers and seed dispersers with arrows of 
+#different colors
+par(mar=c(4,4,3,3),xpd=F)
+plot(dispersers.prda,scaling=2,main="Triplot RDA seed dispersers scaling 2",type="points")
+sp.sc<-scores(dispersers.prda,choices=1:2,scaling=2,display="sp")
+arrows(0,0,sp.sc[,1],sp.sc[,2],length=0,lty=1,col="red",lwd=2)
+spp.scr <- scores(dispersers.prda, display = "species", scaling = 2) # y
+text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]), 
+     col="black", xpd=T)
+legend(x=0.5,y=1.5,legend=paste(1:8,rownames(spp.scr[1:8,]),sep=" "),bty="n",cex=0.8)
+
+coef(dispersers.prda)
+Radj<-RsquareAdj(dispersers.prda)$adj.r.squared
+Radj
+RsquareAdj(dispersers.prda)
+anova.cca(dispersers.prda)
+#anova(dispersers.prda,by="axis",step=1000)
+```
+
+
+##Thinking on:
+1.-Including Species richness~area+forest cover
+2.- Including species diversity~ area+forest cover or in multivariate analysis as proposed by Legendre
+3.-Do a correlation analysis of the PCA axis of the residulas with the environmental variables that were not considered to see if they are related
