@@ -5,7 +5,7 @@ date: "May 22, 2018"
 output: html_document
 ---
 ##Partial RDA Seed dispersers
-```{r,fig.width=10, fig.height=8,warning=F}
+```{r,include=F,warning=F}
 #Load libraries
 library("xlsx")
 library("rmarkdown")
@@ -13,24 +13,31 @@ library("ade4")
 library("vegan")
 library("gclus")
 library("ape")
-
-
+library("dplyr")
+```
+#This data base is using point-count sampling, in which an individual entered the forest and stopped 12 minutes to sample individulas (acoustic and visual identification), then continued walking and did the same procedure 3 times for small patches and 6 times for big patches. The description of each column can be see in the text file
+```{r,include=F}
 #Read file
 base.df<-read.xlsx("Data bases/Frugivores_for_Luis.xlsx",sheetName=1)
+```
 
+#Prepare data base for analysis
+```{r}
 #I am going to aggregate the data by patch. I will obtain the mean of variables
-seed_dispersers_variables<-aggregate(cbind(Area=base.df$Area,Prop_OldFor=base.df$Prop_OldFor,
-                         Pro_allFor=base.df$Pro_allFor,Alti=base.df$Alti)~
+seed_dispersers_variables<-aggregate(cbind(Area=base.df$Area,
+                                           Prop_OldFor=base.df$Prop_OldFor,
+                                           Pro_allFor=base.df$Pro_allFor,
+                                           Alti=base.df$Alti)~
                      base.df$Site,FUN=mean)
 
 #Rename columns
 colnames(seed_dispersers_variables)[1]<-"Site"
 
-#Extract explanatory variables and covariates
-env_var<-data.frame(scale(seed_dispersers_variables[,2:3])) #This is if I aggregate and take out prop all for
-raw.env.data<-data.frame(seed_dispersers_variables[,2:3])
-covariate<-data.frame(scale(seed_dispersers_variables[,5]))
-raw.covariate<-data.frame(seed_dispersers_variables[,5])
+#Extract explanatory variables and covariates, scaled and original variables
+env_var<-data.frame(scale(seed_dispersers_variables[,c("Area","Prop_OldFor","Pro_allFor")])) 
+raw.env.data<-data.frame(seed_dispersers_variables[,c("Area","Prop_OldFor","Pro_allFor")])
+covariate<-data.frame(scale(seed_dispersers_variables[,"Alti"]))
+raw.covariate<-data.frame(seed_dispersers_variables[,"Alti"])
 colnames(raw.covariate)<-"elevation"
 
 
@@ -44,36 +51,53 @@ dispersers.hell<-aggregate(cbind(Turdus_grayi=base.df$Turdus_grayi,
                                  Turdus_assimilis=base.df$Turdus_assimilis,
                                  Saltator_maximus=base.df$Saltator_maximus)~base.df$Site,FUN=sum)
 
-#Make a copy of original data base to use for only Turdus grayi abundance
+#Make a copy of original data base to use for only Turdus grayi abundance (analysis below)
 raw.abundances<-dispersers.hell
-
-#Put rownames on matrix
-#rownames(dispersers.hell)<-base.df[,1]
+```
 
 
+#Pairs plot
+```{r}
 #Plot pairs of abundance of each seed disperser with environmental variables
-#pairs(cbind(dispersers.hell,seed_dispersers_variables[,c(2,3,4,5)]))
-pairs(cbind(dispersers.hell,log(seed_dispersers_variables[,c(2)]),seed_dispersers_variables[,c(3,4,5)]),panel=panel.smooth) #ASK WHAT DOES HE MEANS WITH PROP.ALL.FOR (I WOULD THINK PRIMARY AND SECONDARY FOREST)
+pairs(cbind(dispersers.hell,log(seed_dispersers_variables[,c("Area")]),seed_dispersers_variables[,c("Prop_OldFor","Pro_allFor","Alti")]),panel=panel.smooth) #ASK WHAT DOES HE MEANS WITH PROP.ALL.FOR (I WOULD THINK PRIMARY AND SECONDARY FOREST)
 
-#It is needed that species abundance to be transformed
+#Species abundance need to be transformed to be analyzed in the RDA. Here I am using the Hellinger transformation (STUDY WHY I USED THIS TRANSFORMATION. pAPERS IN FOLDER BIBLIOGRAPHY/MULTIVARIATE ANALYSIS. THERE I CN FIND THE NUMERICAL ECOLOGY WITH R AND OTHER PAPERS)
+dispersers.hell<-decostand(dispersers.hell[-1],"hellinger") #This is if I aggregate species abundance by patch
+
+#Other ways to do the RDA
 #dispersers.hell<-decostand(dispersers.hell,"hellinger") #This is if I use raw data
-dispersers.hell<-decostand(dispersers.hell[-1],"hellinger") #This is if I aggregate
 #dispersers.hell<-decostand(dispersers.hell[-1],"pa") #This is if I want to run a RDA with presence/abscence
 #dispersers.hell<-sqrt(dispersers.hell[-1]) #This is for square root transformation
 ```
+
+#Run RDA
+Conditioned = proportion of variance explanied by the covariate
+Constrained = proportion of variance explained by the explanatory variables
+Unconstrained = proportion of variance not explained by the model
+Importance of components: for RDAx, it is the proportion of variance explained by the model and it has the same number of RDA as the explanatory variables used (In this case 3 variables). For PCAx is the proportion not explained by the model and it has the same number of PC as the number of response variables (In this case 8 species).
+
+#Interpretation
+Constrained variance is too low (0.07) and unconstrained variance is high (0.84), meaning that the explanatory variables are not explaining  too much in the abundance of species.
+Rsquared adjusted is too low
 ```{r,fig.width=8, fig.height=8}
 #Make RDA
-dispersers.prda<-rda(dispersers.hell,env_var,covariate) # all variables
+dispersers.prda<-rda(dispersers.hell,env_var,covariate) 
+
+#Summary of the analysis
 summary(dispersers.prda)
 
 #Unadjusted R^2 retrieved from the rda result
 R2<-RsquareAdj(dispersers.prda)$r.squared
 R2
 
-#Adjusted R^2 retrieved from the rda object
+#Adjusted R^2 retrieved from the rda object. THIS IS THE ONE A SHOULD LOOK AT SINCE IT IS ADJUSTED
 R2adj<-RsquareAdj(dispersers.prda)$adj.r.squared
 R2adj
 
+```
+
+#Plot RDA results
+```{r}
 #Triplot of the rda results
 #Scaling 1: distance triplot for dispersers and seed dispersers with arrows of 
 #different colors
@@ -101,12 +125,18 @@ text(1.1*spp.scr[,1:2], rownames(spp.scr[,1]),
 legend(x=-1.4,y=0,legend=paste(1:8,gsub(pattern="_",replacement=" ",x=rownames(spp.scr[1:8,])),sep=" "),bty="n",cex=1.3)
 
 dev.off()
+```
 
+#Permutation for testing significance of the model
+In this case, the model is not significant
+```{r}
 anova.cca(dispersers.prda)
 
 extractAIC(dispersers.prda)
 #anova(dispersers.prda,by="axis",step=1000)
 ```
+
+
 
 ##Regression of abundance of Turdus grayi only
 ```{r,echo=FALSE}
@@ -240,60 +270,47 @@ pairs(richness,lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
 richness$logArea<-log(richness$Area)
 
 #Plot pairs
-pairs(richness[,c("richness","logArea","Prop_OldFor","elevation")],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
+pairs(richness[,c("richness","logArea","Prop_OldFor","Pro_allFor","elevation")],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
 
-#Make linear model including all the variables
-richnes.model1<-lm(richness~scale(logArea)+scale(Prop_OldFor)+scale(elevation),data=richness)
-summary(richnes.model1)
+#Scale variables
+richness.scaled<-richness %>%
+  mutate(logArea=scale(Area),
+         Prop_OldFor=scale(Prop_OldFor),
+         Pro_allFor=scale(Pro_allFor),
+         elevation=scale(elevation)) %>% 
+  select(-Area)
+
+formula.all<-richness~logArea+Prop_OldFor+Pro_allFor+elevation
+
+#Make poisson regression including all the variables
+summary(richnes.model1<-glm(formula.all,data=richness.scaled,family="poisson"))
+
+#Make poisson regression exluding area
+summary(richnes.model2<-update(richnes.model1, . ~ . -logArea))
+
+#Make poisson regression excluding proportion of all forest
+summary(richnes.model3<-update(richnes.model2, . ~ . -Pro_allFor))
+
+#Make poisson regression excluding proportion of old growth forest
+summary(richnes.model4<-update(richnes.model3, . ~ . -Prop_OldFor))
 
 #Check assumptions
 par(mfrow=c(2,2))
-plot(richnes.model1)
+plot(richnes.model4)
 
 dev.off()
 
 #Check normality of data
 library("car")
-qqPlot(richnes.model1$residuals)
-
-
-
-#Make linear model exluding area
-richnes.model2<-lm(richness~scale(Prop_OldFor)+scale(elevation),data=richness)
-summary(richnes.model2)
-
-#Check assumptions
-par(mfrow=c(2,2))
-plot(richnes.model2)
-
-dev.off()
-
-#Check normality of data
-library("car")
-qqPlot(richnes.model2$residuals)
-
-
-
-
-#Make linear model excluding proportion of forest
-richnes.model3<-lm(richness~scale(elevation),data=richness)
-summary(richnes.model3)
-
-#Check assumptions
-par(mfrow=c(2,2))
-plot(richnes.model3)
-
-dev.off()
-
-#Check normality of data
-library("car")
-qqPlot(richnes.model3$residuals)
+qqPlot(richnes.model4$residuals)
 
 
 #Select best random factor model using AIC
-models.aic<-AIC(richnes.model1,richnes.model2,richnes.model3)
+models.aic<-AIC(richnes.model1,richnes.model2,richnes.model3,richnes.model4)
 library("MuMIn")
 round(Weights(models.aic),digits=2) #Best model includes only proportion of forest 
+
+rm(list = ls()[grep("^richnes.model", ls())])
 ```
 
 # Plot of Species richness vs patch size and proportion of forest
@@ -304,15 +321,15 @@ jpeg("Richness vs patch size and prop forest.jpg",quality=100,width=1200,height=
 par(mar=c(6,6,3,3),xpd=F,mfrow=c(1,2))
 plot(richness$logArea,richness$richness,xlab="Log patch size",ylab="Species richness",cex=2,cex.axis=2,cex.lab=2)
 
-abline(lm(richness ~ logArea, data = richness),col="red",lwd=2)
+abline(glm(richness ~ logArea, data = richness,family="poisson"),col="red",lwd=2)
 
 text(x=7,y=5,"a)",cex=2)
 
 #Proportion of forest
 par(mar=c(6,6,3,3),xpd=F)
-plot(richness$Prop_OldFor,richness$richness,xlab="Proportion of forest",ylab="Species richness",cex=2,cex.axis=2,cex.lab=2)
+plot(richness$Prop_OldFor,richness$richness,xlab="Proportion of old growth forest",ylab="Species richness",cex=2,cex.axis=2,cex.lab=2)
 
-abline(lm(richness ~ Prop_OldFor, data = richness),col="red",lwd=2)
+abline(glm(richness ~ Prop_OldFor, data = richness,family="poisson"),col="red",lwd=2)
 
 text(x=0.8,y=5,"b)",cex=2)
 
@@ -324,6 +341,8 @@ dev.off()
 ```{r}
 #Take out the column that indicates site id
 library("reshape2")
+
+#Create data frame with aggregated abundance of all species per patch
 abundance<-melt(raw.abundances, id.vars="base.df$Site")
 colnames(abundance)<-c("Site","Species","Abundance")
 abundance<-aggregate(abundance$Abundance,by=list(Site=abundance$Site),FUN=sum)
@@ -336,3 +355,37 @@ abundance$logArea<-log(abundance$Area)
 pairs(abundance[,c(-1)],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.smooth)
 
 ```
+
+#Poisson regression for abundance data
+```{r}
+#Scale variables
+abundance.scaled<- abundance %>% 
+  select(Abundance,logArea,Pro_allFor,Prop_OldFor,Alti) %>% 
+  mutate(logArea=scale(logArea),
+         Pro_allFor=scale(Pro_allFor),
+         Prop_OldFor=scale(Prop_OldFor),
+         Alti=scale(Alti)) %>% 
+  ggpairs()
+
+#Model with all variables
+#Check whether the model has over-dispersion or under-dispersion. If the Residual Deviance is greater than the degrees of freedom, then over-dispersion exists. https://newonlinecourses.science.psu.edu/stat504/node/57/
+summary(mod.1<-glm(Abundance~logArea + Pro_allFor + Prop_OldFor + Alti,data=abundance.scaled,family=poisson(link="log")))
+
+#I see there is over-dispersion of the data, so I will use a quasi-poisson model
+summary(mod.1<-glm(Abundance~logArea + Pro_allFor + Prop_OldFor + Alti,data=abundance.scaled,family=quasipoisson(link="log")))
+
+#Take out proportion of all forest
+summary(mod.2<-update(mod.1,.~.-Pro_allFor))
+
+#Take out elevation
+summary(mod.3<-update(mod.2,.~.-Alti))
+
+#Take out elevation
+summary(mod.4<-update(mod.3,.~.-logArea))
+
+#Quasipoisson models do not have AIC, so I will check assumptions of last model. I DO NOT KNOW HOW TO CHECK THE ASSUMPTIONS OF THE MODEL. 
+plot(mod.4)
+
+
+```
+
