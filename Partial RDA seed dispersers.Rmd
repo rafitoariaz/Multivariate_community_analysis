@@ -386,6 +386,5 @@ summary(mod.4<-update(mod.3,.~.-logArea))
 #Quasipoisson models do not have AIC, so I will check assumptions of last model. I DO NOT KNOW HOW TO CHECK THE ASSUMPTIONS OF THE MODEL. 
 plot(mod.4)
 
-
 ```
 
