@@ -357,7 +357,6 @@ p3<-grid.arrange(p1,p2,ncol=2)
 
 ggsave("Richness vs patch size and prop forest.jpg",plot=p3)
 
-rm(p1,p2,p3)
 ```
 
 
@@ -415,23 +414,27 @@ plot(mod.4)
 
 #Plot
 ```{r}
-p1<-abundance %>% 
+p4<-abundance %>% 
   ggplot(aes(x=logArea,y=Abundance)) +
   geom_point() + 
   geom_smooth(method="glm",method.args=list(family="quasipoisson"),col="red") + 
   xlab("Log patch size")
 
-p2<-abundance %>% 
+p5<-abundance %>% 
   ggplot(aes(x=Pro_allFor,y=Abundance)) +
   geom_point() + 
   geom_smooth(method="glm",method.args=list(family="quasipoisson"),col="red") + 
   xlab("Proportion of forest")
 
-p3<-grid.arrange(p1,p2,ncol=2)
+p3<-grid.arrange(p4,p5,ncol=2)
 
 ggsave("Abundance vs patch size and prop forest.jpg",plot=p3)
 
-rm(p1,p2,p3)
+p6<-grid.arrange(p1,p2,p4,p5,ncol=2,nrow=2)
+
+ggsave("Richness and abundance vs patch size and prop forest.jpg",plot=p6)
+
+rm(p1,p2,p3,p4,p5,p6)
 
 ```
 
