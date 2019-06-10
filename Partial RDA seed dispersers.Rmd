@@ -14,6 +14,9 @@ library("vegan")
 library("gclus")
 library("ape")
 library("dplyr")
+library("ggplot2")
+library("tidyr")
+library("gridExtra")
 ```
 #This data base is using point-count sampling, in which an individual entered the forest and stopped 12 minutes to sample individulas (acoustic and visual identification), then continued walking and did the same procedure 3 times for small patches and 6 times for big patches. The description of each column can be see in the text file
 ```{r,include=F}
@@ -278,7 +281,7 @@ richness.scaled<-richness %>%
          Prop_OldFor=scale(Prop_OldFor),
          Pro_allFor=scale(Pro_allFor),
          elevation=scale(elevation)) %>% 
-  select(-Area)
+  dplyr::select(-Area)
 
 formula.all<-richness~logArea+Prop_OldFor+Pro_allFor+elevation
 
@@ -291,7 +294,8 @@ summary(richnes.model2<-update(richnes.model1, . ~ . -logArea))
 #Make poisson regression excluding proportion of all forest
 summary(richnes.model3<-update(richnes.model2, . ~ . -Pro_allFor))
 
-#Make poisson regression excluding proportion of old growth forest
+#Make poisson regression excluding proportion of old growth forest. 
+#I selected Poisson model since the resudal deviance is lower than the degrees of freedom; therefore, there is no overdispersion
 summary(richnes.model4<-update(richnes.model3, . ~ . -Prop_OldFor))
 
 #Check assumptions
@@ -334,6 +338,26 @@ abline(glm(richness ~ Prop_OldFor, data = richness,family="poisson"),col="red",l
 text(x=0.8,y=5,"b)",cex=2)
 
 dev.off()
+
+p1<-richness %>% 
+  ggplot(aes(x=logArea,y=richness)) +
+  geom_point() + 
+  geom_smooth(method="glm",method.args=list(family="poisson"),col="red") + 
+  xlab("Log patch size") +
+  ylab("Richness")
+
+p2<-richness %>% 
+  ggplot(aes(x=Pro_allFor,y=richness)) +
+  geom_point() + 
+  geom_smooth(method="glm",method.args=list(family="poisson"),col="red") + 
+  xlab("Proportion of forest") +
+  ylab("Richness")
+
+p3<-grid.arrange(p1,p2,ncol=2)
+
+ggsave("Richness vs patch size and prop forest.jpg",plot=p3)
+
+rm(p1,p2,p3)
 ```
 
 
@@ -360,12 +384,13 @@ pairs(abundance[,c(-1)],lower.panel=panel.cor,diag.panel=panel.hist,panel=panel.
 ```{r}
 #Scale variables
 abundance.scaled<- abundance %>% 
-  select(Abundance,logArea,Pro_allFor,Prop_OldFor,Alti) %>% 
+  dplyr::select(Abundance,logArea,Pro_allFor,Prop_OldFor,Alti) %>% 
   mutate(logArea=scale(logArea),
          Pro_allFor=scale(Pro_allFor),
          Prop_OldFor=scale(Prop_OldFor),
-         Alti=scale(Alti)) %>% 
-  ggpairs()
+         Alti=scale(Alti))
+
+  #ggpairs(abundance)
 
 #Model with all variables
 #Check whether the model has over-dispersion or under-dispersion. If the Residual Deviance is greater than the degrees of freedom, then over-dispersion exists. https://newonlinecourses.science.psu.edu/stat504/node/57/
@@ -385,6 +410,28 @@ summary(mod.4<-update(mod.3,.~.-logArea))
 
 #Quasipoisson models do not have AIC, so I will check assumptions of last model. I DO NOT KNOW HOW TO CHECK THE ASSUMPTIONS OF THE MODEL. 
 plot(mod.4)
+```
+
+
+#Plot
+```{r}
+p1<-abundance %>% 
+  ggplot(aes(x=logArea,y=Abundance)) +
+  geom_point() + 
+  geom_smooth(method="glm",method.args=list(family="quasipoisson"),col="red") + 
+  xlab("Log patch size")
+
+p2<-abundance %>% 
+  ggplot(aes(x=Pro_allFor,y=Abundance)) +
+  geom_point() + 
+  geom_smooth(method="glm",method.args=list(family="quasipoisson"),col="red") + 
+  xlab("Proportion of forest")
+
+p3<-grid.arrange(p1,p2,ncol=2)
+
+ggsave("Abundance vs patch size and prop forest.jpg",plot=p3)
+
+rm(p1,p2,p3)
 
 ```
 
