@@ -319,7 +319,7 @@ rm(list = ls()[grep("^richnes.model", ls())])
 
 # Plot of Species richness vs patch size and proportion of forest
 ```{r,fig.width=8, fig.height=8}
-jpeg("Richness vs patch size and prop forest.jpg",quality=100,width=1200,height=700)
+jpeg("Graphs/Richness vs patch size and prop forest.jpg",quality=100,width=1200,height=700)
 
 #Patch size
 par(mar=c(6,6,3,3),xpd=F,mfrow=c(1,2))
@@ -355,7 +355,7 @@ p2<-richness %>%
 
 p3<-grid.arrange(p1,p2,ncol=2)
 
-ggsave("Richness vs patch size and prop forest.jpg",plot=p3)
+ggsave("Graphs/Richness vs patch size and prop forest.jpg",plot=p3)
 
 ```
 
@@ -428,11 +428,11 @@ p5<-abundance %>%
 
 p3<-grid.arrange(p4,p5,ncol=2)
 
-ggsave("Abundance vs patch size and prop forest.jpg",plot=p3)
+ggsave("Graphs/Abundance vs patch size and prop forest.jpg",plot=p3)
 
 p6<-grid.arrange(p1,p2,p4,p5,ncol=2,nrow=2)
 
-ggsave("Richness and abundance vs patch size and prop forest.jpg",plot=p6)
+ggsave("Graphs/Richness and abundance vs patch size and prop forest.jpg",plot=p6)
 
 rm(p1,p2,p3,p4,p5,p6)
 
